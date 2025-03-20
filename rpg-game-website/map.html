@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Map - Achaea</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Spectral+SC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Spectral SC', serif;
+            background-color: #0d0d0d;
+            color: #d4af37;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+        }
+        .content {
+            width: 60%;
+            margin-bottom: 200px;
+            margin-top: 200px;
+            border: 2px solid #d4af37;
+        }
+        header {
+            background-color: rgba(26, 26, 26, 0.8);
+            color: #d4af37;
+            padding: 18px 0;
+            text-align: center;
+            font-family: 'Cinzel', serif;
+            box-shadow: 0 4px 2px -2px gray;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+        }
+        nav {
+            display: flex;
+            justify-content: center;
+            background-color: rgba(38, 38, 38, 0.8);
+            box-shadow: 0 4px 2px -2px gray;
+            position: fixed;
+            width: 100%;
+            top: 120px;
+            z-index: 999;
+        }
+        nav a {
+            color: #d4af37;
+            padding: 14px 20px;
+            text-decoration: none;
+            text-align: center;
+            transition: background-color 0.3s ease;
+        }
+        nav a:hover {
+            background-color: #333333;
+        }
+        .container {
+            padding: 20px;
+        }
+        footer {
+            background-color: rgba(26, 26, 26, 0.8);
+            color: #d4af37;
+            text-align: center;
+            padding: 10px 0;
+            position: fixed;
+            width: 100%;
+            bottom: 0;
+            box-shadow: 0 -4px 2px -2px gray;
+        }
+        .sidebar {
+            position: fixed;
+            top: 171px;
+            left: 0;
+            width: 200px;
+            background-color: rgba(38, 38, 38, 0.8);
+            height: calc(100% - 285px);
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
+        }
+        .sidebar a {
+            display: block;
+            color: #d4af37;
+            padding: 10px 0;
+            text-decoration: none;
+            transition: background-color 0.3s ease;
+        }
+        .sidebar a:hover {
+            background-color: #333333;
+        }
+        .map-container {
+            position: relative;
+            width: 100%;
+            height: 750px; /* Adjusted height to fit the image */
+            background-image: url('images/Achaea (1).jpg'); /* Ensure the image path is correct */
+            background-size: contain; /* Adjust to fit the image */
+            background-repeat: no-repeat;
+            background-position: center;
+            background-color: #333333; /* Fallback background color */
+        }
+        .map-point {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background-size: cover;
+            cursor: pointer;
+            border: 2px solid #d4af37; /* Added border to make points visible */
+        }
+        .map-point:hover .tooltip {
+            display: block;
+        }
+        .tooltip {
+            display: none;
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #d4af37;
+            padding: 10px;
+            border-radius: 5px;
+            width: 200px;
+            text-align: center;
+        }
+        .grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: repeat(10, 1fr); /* 10 columns */
+            grid-template-rows: repeat(10, 1fr); /* 10 rows */
+        }
+        .grid div {
+            border: 1px solid rgba(255, 255, 255, 0.3); /* Light grid lines */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: rgba(255, 255, 255, 0.5); /* Light text color */
+            font-size: 12px;
+            position: relative;
+        }
+        .hover-image {
+            display: none;
+            position: absolute;
+            width: 150px; /* Adjusted to fit within the cell */
+            height: 150px; /* Adjusted to fit within the cell */
+            background-image: url('images/placeholders/grey.png'); /* Ensure the grey image is set */
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            border: 2px solid #d4af37; /* Added border to make the image more visible */
+        }
+        .info-box {
+            display: none;
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #d4af37;
+            padding: 20px;
+            border: 2px solid #d4af37;
+            font-family: 'Monotype Corsiva', cursive;
+            font-size: 14px;
+            width: 300px;
+            z-index: 1001;
+            border: 2px dashed red; /* Add this line to make the box more visible */
+        }
+        .info-box h2 {
+            font-size: 18px;
+            font-weight: bold;
+            text-decoration: underline;
+            margin-top: 0;
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const gridCells = document.querySelectorAll('.grid div');
+            const hoverImage = document.querySelector('.hover-image');
+            const mapContainer = document.querySelector('.map-container');
+            const infoBox = document.createElement('div');
+            infoBox.classList.add('info-box');
+            document.body.appendChild(infoBox);
+
+            // Set the hover image to the 6,3 cell
+            const hoverImageCell = document.querySelector('.grid div:nth-child(53)');
+            hoverImageCell.addEventListener('mouseover', function() {
+                const topPercent = parseFloat(hoverImageCell.getAttribute('data-top'));
+                const leftPercent = parseFloat(hoverImageCell.getAttribute('data-left'));
+                const containerRect = mapContainer.getBoundingClientRect();
+
+                const top = (containerRect.height * topPercent / 100);
+                const left = (containerRect.width * leftPercent / 100);
+
+                hoverImage.style.top = `${top}px`;
+                hoverImage.style.left = `${left}px`;
+                hoverImage.style.backgroundImage = 'url(images/placeholders/grey.png)'; // Ensure the grey image is set
+                hoverImage.style.display = 'block';
+            });
+
+            hoverImageCell.addEventListener('mouseout', function() {
+                hoverImage.style.display = 'none';
+            });
+
+            // Show green.png on hover for grid cells 5,7 and 5,6
+            const cell57 = document.querySelector('.grid div:nth-child(47)');
+            const cell56 = document.querySelector('.grid div:nth-child(46)');
+
+            cell57.addEventListener('mouseover', function() {
+                const topPercent = parseFloat(cell56.getAttribute('data-top'));
+                const leftPercent = parseFloat(cell56.getAttribute('data-left'));
+                const containerRect = mapContainer.getBoundingClientRect();
+
+                const top = (containerRect.height * topPercent / 100);
+                const left = (containerRect.width * leftPercent / 100);
+
+                hoverImage.style.top = `${top}px`;
+                hoverImage.style.left = `${left}px`;
+                hoverImage.style.backgroundImage = 'url(images/placeholders/green.png)';
+                hoverImage.style.display = 'block';
+            });
+
+            cell57.addEventListener('mouseout', function() {
+                hoverImage.style.display = 'none';
+            });
+
+            cell56.addEventListener('mouseover', function() {
+                hoverImage.style.backgroundImage = 'url(images/placeholders/green.png)';
+                hoverImage.style.top = `${50}%`;
+                hoverImage.style.left = `${60}%`;
+                hoverImage.style.display = 'block';
+            });
+
+            cell56.addEventListener('mouseout', function() {
+                hoverImage.style.display = 'none';
+            });
+
+
+            // Show white.png on hover for all cells in column 10
+            const cell610 = document.querySelector('.grid div:nth-child(60)');
+            const column10Cells = document.querySelectorAll('.grid div:nth-child(10n)');
+
+            column10Cells.forEach(cell => {
+                cell.addEventListener('mouseover', function() {
+                    const topPercent = parseFloat(cell610.getAttribute('data-top'));
+                    const leftPercent = parseFloat(cell610.getAttribute('data-left'));
+                    const containerRect = mapContainer.getBoundingClientRect();
+
+                    const top = (containerRect.height * topPercent / 100);
+                    const left = (containerRect.width * leftPercent / 100);
+
+                    hoverImage.style.top = `${top}px`;
+                    hoverImage.style.left = `${left}px`;
+                    hoverImage.style.backgroundImage = 'url(images/placeholders/white.png)';
+                    hoverImage.style.display = 'block';
+                });
+
+                cell.addEventListener('mouseout', function() {
+                    hoverImage.style.display = 'none';
+                });
+            });
+
+            // Show red.png on hover for grid cells 4,1, 4,2, 5,1, and 5,2
+            const cell52 = document.querySelector('.grid div:nth-child(42)');
+            const cellsRed = [
+                document.querySelector('.grid div:nth-child(31)'),
+                document.querySelector('.grid div:nth-child(32)'),
+                document.querySelector('.grid div:nth-child(41)'),
+                cell52
+            ];
+
+            cellsRed.forEach(cell => {
+                cell.addEventListener('mouseover', function() {
+                    const topPercent = parseFloat(cell52.getAttribute('data-top'));
+                    const leftPercent = parseFloat(cell52.getAttribute('data-left'));
+                    const containerRect = mapContainer.getBoundingClientRect();
+
+                    const top = (containerRect.height * topPercent / 100);
+                    const left = (containerRect.width * leftPercent / 100);
+
+                    hoverImage.style.top = `${top}px`;
+                    hoverImage.style.left = `${left}px`;
+                    hoverImage.style.backgroundImage = 'url(images/placeholders/red.png)';
+                    hoverImage.style.display = 'block';
+                });
+
+                cell.addEventListener('mouseout', function() {
+                    hoverImage.style.display = 'none';
+                });
+            });
+
+            // Show lime.png on hover for grid cells 6,1 and 7,1
+            const cell61 = document.querySelector('.grid div:nth-child(51)');
+            const cell71 = document.querySelector('.grid div:nth-child(61)');
+            const cellsLime = [cell61, cell71];
+
+            // Create hover image (lime.png) element
+            const hoverImageLime = document.createElement('div');
+            hoverImageLime.style.position = 'absolute';
+            hoverImageLime.style.display = 'none';
+            hoverImageLime.style.width = '100px'; // Adjust as needed
+            hoverImageLime.style.height = '100px';
+            hoverImageLime.style.backgroundSize = 'cover';
+            hoverImageLime.style.backgroundImage = 'url(images/placeholders/lime.png)';
+            document.body.appendChild(hoverImageLime);
+
+            // Show lime.png on hover
+            cellsLime.forEach(cell => {
+                cell.addEventListener('mouseover', function() {
+                    const topPercent = parseFloat(cell71.getAttribute('data-top'));
+                    const leftPercent = parseFloat(cell71.getAttribute('data-left'));
+                    const containerRect = mapContainer.getBoundingClientRect();
+
+                    const top = (containerRect.height * topPercent / 100);
+                    const left = (containerRect.width * leftPercent / 50);
+
+                    hoverImageLime.style.top = `${top}px`;
+                    hoverImageLime.style.left = `${left}px`;
+                    hoverImageLime.style.display = 'block';
+                });
+
+                cell.addEventListener('mouseout', function() {
+                    hoverImageLime.style.display = 'none';
+                    infoBox.style.display = 'none'; // Hide Elflore text
+                });
+
+                // Display elflore text on click
+                cell.addEventListener('click', function() {
+                    const topPercent = parseFloat(cell71.getAttribute('data-top'));
+                    const leftPercent = parseFloat(cell71.getAttribute('data-left'));
+                    const containerRect = mapContainer.getBoundingClientRect();
+
+                    const top = (containerRect.height * topPercent / 100);
+                    const left = (containerRect.width * leftPercent / 50);
+
+                    fetch('text/elflore.txt')
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            return response.text();
+                        })
+                        .then(text => {
+                            infoBox.innerHTML = text;
+                            infoBox.style.top = `${Math.min(top, containerRect.height - infoBox.offsetHeight)}px`;
+                            infoBox.style.left = `${Math.min(left - 50, containerRect.width - infoBox.offsetWidth)}px`; // Adjust position to the left of lime.png
+                            infoBox.style.display = 'block';
+                        })
+                        .catch(error => console.error('Error fetching Elflore text:', error));
+                });
+            });
+
+            // Hide Elflore text when cursor is no longer above Elflore
+            infoBox.addEventListener('mouseout', function() {
+                infoBox.style.display = 'none';
+            });
+        });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const mapContainer = document.querySelector('.map-container');
+            const hoverImage = document.createElement('div');
+            hoverImage.style.position = 'absolute';
+            hoverImage.style.display = 'none';
+            hoverImage.style.width = '100px'; // Adjust as needed
+            hoverImage.style.height = '100px';
+            hoverImage.style.backgroundSize = 'cover';
+            document.body.appendChild(hoverImage);
+
+            const infoBox = document.createElement('div');
+            infoBox.classList.add('info-box');
+            document.body.appendChild(infoBox);
+
+            const cell61 = document.querySelector('.grid div:nth-child(51)');
+            const cell71 = document.querySelector('.grid div:nth-child(61)');
+            const cellsLime = [cell61, cell71];
+
+            // Show lime.png on hover
+            cellsLime.forEach(cell => {
+                cell.addEventListener('mouseover', function() {
+                    const topPercent = parseFloat(cell.getAttribute('data-top'));
+                    const leftPercent = parseFloat(cell.getAttribute('data-left'));
+                    const containerRect = mapContainer.getBoundingClientRect();
+
+                    const top = (containerRect.height * topPercent / 100);
+                    const left = (containerRect.width * leftPercent / 100);
+
+                    hoverImage.style.top = `${top}px`;
+                    hoverImage.style.left = `${left}px`;
+                    hoverImage.style.backgroundImage = 'url(images/placeholders/lime.png)';
+                    hoverImage.style.display = 'block';
+                });
+
+                cell.addEventListener('mouseout', function() {
+                    hoverImage.style.display = 'none';
+                });
+
+                // Show Elflore text on click
+                cell.addEventListener('click', function() {
+                    const topPercent = parseFloat(cell.getAttribute('data-top'));
+                    const leftPercent = parseFloat(cell.getAttribute('data-left'));
+                    const containerRect = mapContainer.getBoundingClientRect();
+
+                    const top = (containerRect.height * topPercent / 100);
+                    const left = (containerRect.width * leftPercent / 100);
+
+                    console.log('Fetching Elflore text...');
+                    fetch('elflore.txt')
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            return response.text();
+                        })
+                        .then(text => {
+                            console.log('Elflore text fetched successfully:', text);
+                            infoBox.innerHTML = text;
+                            infoBox.style.top = `${Math.min(top, containerRect.height - infoBox.offsetHeight)}px`;
+                            infoBox.style.left = `${Math.min(left - 50, containerRect.width - infoBox.offsetWidth)}px`; // Adjust position to the left of lime.png
+                            infoBox.style.display = 'block';
+                        })
+                        .catch(error => console.error('Error fetching Elflore text:', error));
+                });
+            });
+
+            // Hide Elflore text when cursor is no longer above Elflore
+            infoBox.addEventListener('mouseout', function() {
+                infoBox.style.display = 'none';
+            });
+        });
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Interactive Map of Achaea</h1>
+    </header>
+    <nav>
+        <a href="home.html">Home</a>
+        <a href="about.html">About</a>
+        <a href="rules.html">Rules</a>
+        <a href="characters.html">Characters</a>
+        <a href="contact.html">Contact</a>
+    </nav>
+    <div class="sidebar">
+        <a href="home.html">Home</a>
+        <a href="about.html">About</a>
+        <a href="rules.html">Rules</a>
+        <a href="characters.html">Characters</a>
+        <a href="contact.html">Contact</a>
+    </div>
+    <div class="content">
+        <div class="container">
+            <section id="map">
+                <h2>Interactive Map</h2>
+                <div class="map-container">
+                    <div class="grid">
+                        <div data-top="10%" data-left="10%">1,1</div>
+                        <div data-top="10%" data-left="20%">1,2</div>
+                        <div data-top="10%" data-left="30%">1,3</div>
+                        <div data-top="10%" data-left="40%">1,4</div>
+                        <div data-top="10%" data-left="50%">1,5</div>
+                        <div data-top="10%" data-left="60%">1,6</div>
+                        <div data-top="10%" data-left="70%">1,7</div>
+                        <div data-top="10%" data-left="80%">1,8</div>
+                        <div data-top="10%" data-left="90%">1,9</div>
+                        <div data-top="10%" data-left="100%">1,10</div>
+                        <div data-top="20%" data-left="10%">2,1</div>
+                        <div data-top="20%" data-left="20%">2,2</div>
+                        <div data-top="20%" data-left="30%">2,3</div>
+                        <div data-top="20%" data-left="40%">2,4</div>
+                        <div data-top="20%" data-left="50%">2,5</div>
+                        <div data-top="20%" data-left="60%">2,6</div>
+                        <div data-top="20%" data-left="70%">2,7</div>
+                        <div data-top="20%" data-left="80%">2,8</div>
+                        <div data-top="20%" data-left="90%">2,9</div>
+                        <div data-top="20%" data-left="100%">2,10</div>
+                        <div data-top="30%" data-left="10%">3,1</div>
+                        <div data-top="30%" data-left="20%">3,2</div>
+                        <div data-top="30%" data-left="30%">3,3</div>
+                        <div data-top="30%" data-left="40%">3,4</div>
+                        <div data-top="30%" data-left="50%">3,5</div>
+                        <div data-top="30%" data-left="60%">3,6</div>
+                        <div data-top="30%" data-left="70%">3,7</div>
+                        <div data-top="30%" data-left="80%">3,8</div>
+                        <div data-top="30%" data-left="90%">3,9</div>
+                        <div data-top="30%" data-left="100%">3,10</div>
+                        <div data-top="40%" data-left="10%">4,1</div>
+                        <div data-top="40%" data-left="20%">4,2</div>
+                        <div data-top="40%" data-left="30%">4,3</div>
+                        <div data-top="40%" data-left="40%">4,4</div>
+                        <div data-top="40%" data-left="50%">4,5</div>
+                        <div data-top="40%" data-left="60%">4,6</div>
+                        <div data-top="40%" data-left="70%">4,7</div>
+                        <div data-top="40%" data-left="80%">4,8</div>
+                        <div data-top="40%" data-left="90%">4,9</div>
+                        <div data-top="40%" data-left="100%">4,10</div>
+                        <div data-top="50%" data-left="10%">5,1</div>
+                        <div data-top="50%" data-left="20%">5,2</div>
+                        <div data-top="50%" data-left="30%">5,3</div>
+                        <div data-top="50%" data-left="40%">5,4</div>
+                        <div data-top="50%" data-left="50%">5,5</div>
+                        <div data-top="50%" data-left="60%">5,6</div>
+                        <div data-top="50%" data-left="70%">5,7</div>
+                        <div data-top="50%" data-left="80%">5,8</div>
+                        <div data-top="50%" data-left="90%">5,9</div>
+                        <div data-top="50%" data-left="100%">5,10</div>
+                        <div data-top="60%" data-left="10%">6,1</div>
+                        <div data-top="60%" data-left="20%">6,2</div>
+                        <div data-top="60%" data-left="30%">6,3</div>
+                        <div data-top="60%" data-left="40%">6,4</div>
+                        <div data-top="60%" data-left="50%">6,5</div>
+                        <div data-top="60%" data-left="60%">6,6</div>
+                        <div data-top="60%" data-left="70%">6,7</div>
+                        <div data-top="60%" data-left="80%">6,8</div>
+                        <div data-top="60%" data-left="90%">6,9</div>
+                        <div data-top="60%" data-left="100%">6,10</div>
+                        <div data-top="70%" data-left="10%">7,1</div>
+                        <div data-top="70%" data-left="20%">7,2</div>
+                        <div data-top="70%" data-left="30%">7,3</div>
+                        <div data-top="70%" data-left="40%">7,4</div>
+                        <div data-top="70%" data-left="50%">7,5</div>
+                        <div data-top="70%" data-left="60%">7,6</div>
+                        <div data-top="70%" data-left="70%">7,7</div>
+                        <div data-top="70%" data-left="80%">7,8</div>
+                        <div data-top="70%" data-left="90%">7,9</div>
+                        <div data-top="70%" data-left="100%">7,10</div>
+                        <div data-top="80%" data-left="10%">8,1</div>
+                        <div data-top="80%" data-left="20%">8,2</div>
+                        <div data-top="80%" data-left="30%">8,3</div>
+                        <div data-top="80%" data-left="40%">8,4</div>
+                        <div data-top="80%" data-left="50%">8,5</div>
+                        <div data-top="80%" data-left="60%">8,6</div>
+                        <div data-top="80%" data-left="70%">8,7</div>
+                        <div data-top="80%" data-left="80%">8,8</div>
+                        <div data-top="80%" data-left="90%">8,9</div>
+                        <div data-top="80%" data-left="100%">8,10</div>
+                        <div data-top="90%" data-left="10%">9,1</div>
+                        <div data-top="90%" data-left="20%">9,2</div>
+                        <div data-top="90%" data-left="30%">9,3</div>
+                        <div data-top="90%" data-left="40%">9,4</div>
+                        <div data-top="90%" data-left="50%">9,5</div>
+                        <div data-top="90%" data-left="60%">9,6</div>
+                        <div data-top="90%" data-left="70%">9,7</div>
+                        <div data-top="90%" data-left="80%">9,8</div>
+                        <div data-top="90%" data-left="90%">9,9</div>
+                        <div data-top="90%" data-left="100%">9,10</div>
+                        <div data-top="100%" data-left="10%">10,1</div>
+                        <div data-top="100%" data-left="20%">10,2</div>
+                        <div data-top="100%" data-left="30%">10,3</div>
+                        <div data-top="100%" data-left="40%">10,4</div>
+                        <div data-top="100%" data-left="50%">10,5</div>
+                        <div data-top="100%" data-left="60%">10,6</div>
+                        <div data-top="100%" data-left="70%">10,7</div>
+                        <div data-top="100%" data-left="80%">10,8</div>
+                        <div data-top="100%" data-left="90%">10,9</div>
+                        <div data-top="100%" data-left="100%">10,10</div>
+                    </div>
+                    <div class="hover-image"></div>
+                    <div class="map-point" style="top: 20%; left: 30%; background-image: url('placeholders/point1.png');">
+                        <div class="tooltip">Character 1: Description</div>
+                    </div>
+                    <div class="map-point" style="top: 50%; left: 50%; background-image: url('placeholders/point2.png');">
+                        <div class="tooltip">Character 2: Description</div>
+                    </div>
+                    <div class="map-point" style="top: 70%; left: 80%; background-image: url('placeholders/point3.png');">
+                        <div class="tooltip">Character 3: Description</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+    <footer>
+        <p>&copy; 2023 Achaea. All rights reserved.</p>
+    </footer>
+</body>
+</html>
